@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Build & Package Release
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libwayland-dev libxkbcommon-dev libfontconfig1-dev
+
+      - name: Build and Package Tarball
+        run: |
+          cargo build --release --locked
+          VERSION="${GITHUB_REF_NAME#v}"
+          PKG="wyrd-wallpaper-v${VERSION}-linux-x86_64"
+          mkdir -p "dist/${PKG}/bin" "dist/${PKG}/systemd"
+          strip -s target/release/wyrd-wallpaper -o "dist/${PKG}/bin/wyrd-wallpaper" || cp target/release/wyrd-wallpaper "dist/${PKG}/bin/wyrd-wallpaper"
+          cp -r assets "dist/${PKG}/"
+          cp systemd/wyrd-wallpaper.service "dist/${PKG}/systemd/"
+          cp README.md CHANGELOG.md LICENSE LICENSE-MIT LICENSE-APACHE install.sh uninstall.sh "dist/${PKG}/"
+          tar -czf "dist/${PKG}.tar.gz" -C dist "${PKG}"
+          (cd dist && sha256sum "${PKG}.tar.gz" > "${PKG}.tar.gz.sha256")
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/wyrd-wallpaper-*.tar.gz
+            dist/wyrd-wallpaper-*.tar.gz.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

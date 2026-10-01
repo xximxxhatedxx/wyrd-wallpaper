@@ -1,0 +1,68 @@
+# =============================================================================
+# Wyrd Shell - Git Ignore
+# =============================================================================
+
+# Rust / Cargo build outputs
+/target/
+**/*.rs.bk
+*.pdb
+
+# Release packaging & distribution archives
+/dist/
+*.tar.gz
+*.tar.xz
+*.tar.bz2
+*.tar.zst
+*.sha256
+
+# Precompiled WASM artifacts in root or scratch (keep source/modules intact)
+/*.wasm
+/*.cwasm
+
+# Runtime sockets, logs, and temporary state
+*.sock
+*.log
+*.pid
+*.bak
+*.bak.*
+core
+core.*
+vgcore.*
+
+# Environment and local configs
+.env
+.env.*
+!.env.example
+settings.local.toml
+settings.local.lua
+
+# Editor and IDE configurations
+.idea/
+.vscode/
+*.code-workspace
+.zed/
+.fleet/
+*.sublime-project
+*.sublime-workspace
+
+# Swap and temporary editor files
+*~
+*.swp
+*.swo
+.*.swp
+.*.swo
+.#*
+\#*#
+
+# OS generated metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Tooling scratch directories
+.gemini/
+scratch/
