@@ -99,6 +99,7 @@ fn acquire_toggle_lock() -> Option<(std::fs::File, PathBuf)> {
         .open(&lock_path)
         .ok()?;
 
+    // SAFETY: flock is a POSIX advisory lock operating on a valid, open file descriptor.
     let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
     if rc != 0 {
         // Another picker currently holds the exclusive flock; verify its identity via /proc/<pid>/comm before signalling
@@ -108,6 +109,7 @@ fn acquire_toggle_lock() -> Option<(std::fs::File, PathBuf)> {
                     && old_pid != std::process::id() as i32
                     && is_wyrd_wallpaper_process(old_pid)
                 {
+                    // SAFETY: old_pid is verified via /proc to be a valid wyrd-wallpaper process before sending SIGTERM.
                     unsafe {
                         libc::kill(old_pid, libc::SIGTERM);
                     }
@@ -366,6 +368,7 @@ pub fn run(directory: &Path, current: Option<&Path>) -> Result<Option<PickerSele
                 revents: 0,
             };
             let timeout_ms = if state.is_animating() { 16 } else { 50 };
+            // SAFETY: poll is a stateless POSIX syscall with a valid pollfd reference and non-negative count.
             let ready = unsafe { libc::poll(&mut pollfd, 1, timeout_ms) };
             if ready > 0 {
                 let _ = guard.read();
@@ -940,15 +943,19 @@ impl PickerState {
 
 fn create_shm_file(size: usize) -> Result<std::fs::File> {
     let name = std::ffi::CString::new("wyrd-wallpaper-picker")?;
+    // SAFETY: memfd_create creates an anonymous, private kernel memory fd with cloexec.
     let fd = unsafe { libc::memfd_create(name.as_ptr(), libc::MFD_CLOEXEC) };
     if fd < 0 {
         anyhow::bail!("memfd_create failed");
     }
+    // SAFETY: fd is a valid open descriptor; ftruncate sizes the anonymous buffer to `size`.
     if unsafe { libc::ftruncate(fd, size as libc::off_t) } < 0 {
+        // SAFETY: closing fd to avoid descriptor leak on error.
         unsafe { libc::close(fd) };
         anyhow::bail!("ftruncate failed");
     }
     use std::os::fd::FromRawFd;
+    // SAFETY: fd is a valid, exclusively owned anonymous memory descriptor.
     Ok(unsafe { std::fs::File::from_raw_fd(fd) })
 }
 

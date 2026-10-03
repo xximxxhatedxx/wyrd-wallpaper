@@ -25,7 +25,11 @@ use wayland_protocols_wlr::layer_shell::v1::client::{
 };
 
 #[derive(Parser, Debug)]
-#[command(name = "wyrd-wallpaper", about = "Wyrd Wayland wallpaper daemon")]
+#[command(
+    name = "wyrd-wallpaper",
+    version,
+    about = "Wyrd Wayland wallpaper daemon"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<Command>,
@@ -324,6 +328,7 @@ impl WallpaperState {
         {
             self.decoded_image = None;
             #[cfg(all(target_os = "linux", target_env = "gnu"))]
+            // SAFETY: malloc_trim is an advisory glibc memory release call that safely returns unused heap memory to the OS.
             unsafe {
                 libc::malloc_trim(0);
             }
@@ -389,6 +394,7 @@ impl WallpaperState {
             self.last_transition_step = None;
             self.decoded_image = None;
             #[cfg(all(target_os = "linux", target_env = "gnu"))]
+            // SAFETY: malloc_trim is an advisory glibc memory release call that safely returns unused heap memory to the OS.
             unsafe {
                 libc::malloc_trim(0);
             }
@@ -569,6 +575,7 @@ fn blend_wallpaper_transition(
 fn create_shm_file(size: usize) -> Result<std::fs::File> {
     let name = format!("/wyrd-wall-shm-{}", std::process::id());
     let name_c = std::ffi::CString::new(name)?;
+    // SAFETY: shm_open with O_CREAT | O_EXCL creates an exclusive POSIX shared memory object.
     let fd = unsafe {
         libc::shm_open(
             name_c.as_ptr(),
@@ -579,17 +586,21 @@ fn create_shm_file(size: usize) -> Result<std::fs::File> {
     if fd < 0 {
         return Err(std::io::Error::last_os_error().into());
     }
+    // SAFETY: shm_unlink removes the named link from /dev/shm while the open file descriptor remains valid.
     unsafe {
         libc::shm_unlink(name_c.as_ptr());
     }
+    // SAFETY: fd is a valid open file descriptor; resizing memory-backed fd to `size`.
     if unsafe { libc::ftruncate(fd, size as libc::off_t) } != 0 {
         let error = std::io::Error::last_os_error();
+        // SAFETY: fd is valid and must be closed to avoid resource leak on error.
         unsafe {
             libc::close(fd);
         }
         return Err(error.into());
     }
     use std::os::unix::io::FromRawFd;
+    // SAFETY: `fd` is a valid, open, non-negative file descriptor exclusively owned by this process.
     Ok(unsafe { std::fs::File::from_raw_fd(fd) })
 }
 
@@ -955,6 +966,7 @@ fn acquire_single_instance_lock() -> Option<std::fs::File> {
         .truncate(false)
         .open(&lock_path)
         .ok()?;
+    // SAFETY: flock is a standard POSIX advisory lock operating on a valid, open file descriptor.
     let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
     if rc != 0 {
         return None;
@@ -1191,6 +1203,7 @@ fn run_daemon(initial_image: Option<PathBuf>, output_filter: Option<String>) -> 
         } else {
             50
         };
+        // SAFETY: poll is a stateless POSIX syscall with valid pollfd buffer and non-negative count.
         let ready = unsafe { libc::poll(&mut pollfd, 1, timeout_ms) };
         if ready > 0 {
             if let Err(wayland_client::backend::WaylandError::Io(ref err)) = guard.read() {

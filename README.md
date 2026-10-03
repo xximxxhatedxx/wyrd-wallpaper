@@ -1,6 +1,6 @@
 # wyrd-wallpaper
 
-> **Status (`v0.1.0`)**: Early public release. State file schemas and CLI flags may evolve before `1.0`.
+> **Status (`v0.1.1`)**: Early public release. State file schemas and CLI flags may evolve before `1.0`.
 
 ![wyrd-wallpaper preview](assets/preview.png)
 
